@@ -7,11 +7,10 @@ import {ApolloServer} from 'apollo-server-express';
 import {buildSchema} from 'type-graphql'
 import { HelloResolvers } from "./resolvers/hello";
 import { PostResolvers } from './resolvers/post';
-// import { Post } from './enteties/Post';
 import { UserResolvers } from './resolvers/user';
 import cors from "cors";
 
-import redis from 'redis';
+import Redis from 'ioredis';
 import session from 'express-session';
 import connectRedis from 'connect-redis';
 import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core';
@@ -21,11 +20,9 @@ const main = async () => {
     // sendEmail("bob@bob.com", "hello guys its me");
     const orm = await MikroORM.init(microConfig);
     await orm.getMigrator().up();
-    // const post = orm.em.create(Post, {title: "MY FIRST POST"});
-    // await orm.em.persistAndFlush(post);
     const app = express();
     const RedisStore = connectRedis(session)
-    const redisClient = redis.createClient();
+    const redis = new Redis();
     app.use(cors({
         origin:"http://localhost:3000",
         credentials:true
@@ -33,7 +30,7 @@ const main = async () => {
     app.use(
     session({
         name:COOKIE_NAME,
-        store: new RedisStore({ client: redisClient,
+        store: new RedisStore({ client: redis,
             disableTouch:true,
         }),
         cookie:{
@@ -56,7 +53,7 @@ const main = async () => {
             ApolloServerPluginLandingPageGraphQLPlayground({}),
         ],
         // introspection: true,
-        context: ({req, res}) => ({em : orm.em, req, res}),
+        context: ({req, res}) => ({em : orm.em, req, res, redis}),
     })
     await apolloServer.start();
     apolloServer.applyMiddleware({app, cors:false});
@@ -64,7 +61,5 @@ const main = async () => {
     app.listen(4000, () => {
         console.log("SERVER STARTED ON PORT: 4000");
     });
-    // const posts = await orm.em.find(Post, {});
-    // console.log(posts);
 }
 main().catch(err => console.log(err));
